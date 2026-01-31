@@ -1,9 +1,0 @@
-{
-  "version": 2,
-  "name": "tiltscope",
-  "public": true,
-  "routes": [
-    { "src": "/", "dest": "/index.html" },
-    { "src": "/docs", "dest": "/docs.html" }
-  ]
-}
