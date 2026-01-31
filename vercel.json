@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "name": "tiltscope",
+  "public": true,
+  "buildCommand": null,
+  "outputDirectory": "frontend",
+  "routes": [
+    { "src": "/", "dest": "/frontend/index.html" },
+    { "src": "/docs", "dest": "/frontend/docs.html" },
+    { "src": "/index.html", "dest": "/frontend/index.html" },
+    { "src": "/docs.html", "dest": "/frontend/docs.html" }
+  ]
+}

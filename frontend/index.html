@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TILTSCOPE - AI Esports Win Predictor</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Rajdhani', sans-serif; background: #0a0a12; color: #fff; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 5px currentColor; } 50% { box-shadow: 0 0 25px currentColor; } }
+    @keyframes scanline { 0% { top: -10%; } 100% { top: 110%; } }
+    @keyframes barFill { from { width: 0; } }
+    .fade-in { animation: fadeIn 0.6s ease forwards; }
+    .slide-in { animation: slideIn 0.5s ease forwards; }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0a0a12; }
+    ::-webkit-scrollbar-thumb { background: #ff005544; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #ff0055; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // === DATA ===
+    const MATCHES = [
+      {
+        id: 1, team1: "Cloud9", team2: "NRG", score1: 1, score2: 2, winner: "NRG",
+        tournament: "VCT Americas - Stage 2 2025", date: "2025-01-30",
+        games: [
+          { num: 1, map: "haven", s1: 13, s2: 10, winner: "Cloud9", z1: 0.62, z2: -0.30, pred: { p1: 97, p2: 3, correct: true },
+            t1: [
+              { name: "OXY", agent: "neon", k: 24, d: 16, kd: 1.50, z: 0.70, state: "hot", base: 1.19 },
+              { name: "v1c", agent: "omen", k: 22, d: 15, kd: 1.47, z: 1.08, state: "hot", base: 1.08 },
+              { name: "Xeppaa", agent: "vyse", k: 21, d: 18, kd: 1.17, z: 1.26, state: "hot", base: 0.83 },
+              { name: "neT", agent: "viper", k: 18, d: 15, kd: 1.20, z: 1.27, state: "hot", base: 0.71 },
+              { name: "mitch", agent: "skye", k: 4, d: 16, kd: 0.25, z: -1.23, state: "cold", base: 0.65 }
+            ],
+            t2: [
+              { name: "s0m", agent: "viper", k: 19, d: 16, kd: 1.19, z: 1.02, state: "hot", base: 0.90 },
+              { name: "skuba", agent: "killjoy", k: 17, d: 16, kd: 1.06, z: -0.31, state: "normal", base: 1.16 },
+              { name: "mada", agent: "neon", k: 15, d: 20, kd: 0.75, z: -0.46, state: "normal", base: 1.24 },
+              { name: "Ethan", agent: "omen", k: 16, d: 20, kd: 0.80, z: -0.80, state: "cold", base: 1.16 },
+              { name: "brawk", agent: "sova", k: 13, d: 17, kd: 0.76, z: -0.98, state: "cold", base: 1.56 }
+            ]
+          },
+          { num: 2, map: "corrode", s1: 2, s2: 13, winner: "NRG", z1: -0.97, z2: 1.02, pred: { p1: 3.2, p2: 96.8, correct: true },
+            t1: [
+              { name: "mitch", agent: "skye", k: 7, d: 14, kd: 0.50, z: -0.47, state: "normal", base: 0.65 },
+              { name: "Xeppaa", agent: "vyse", k: 9, d: 13, kd: 0.69, z: -0.52, state: "cold", base: 0.83 },
+              { name: "neT", agent: "viper", k: 6, d: 12, kd: 0.50, z: -0.56, state: "cold", base: 0.71 },
+              { name: "v1c", agent: "omen", k: 7, d: 14, kd: 0.50, z: -1.61, state: "tilted", base: 1.08 },
+              { name: "OXY", agent: "neon", k: 6, d: 14, kd: 0.43, z: -1.70, state: "tilted", base: 1.19 }
+            ],
+            t2: [
+              { name: "mada", agent: "waylay", k: 21, d: 5, kd: 4.20, z: 2.79, state: "fire", base: 1.24 },
+              { name: "brawk", agent: "sova", k: 18, d: 7, kd: 2.57, z: 1.24, state: "hot", base: 1.56 },
+              { name: "s0m", agent: "omen", k: 7, d: 6, kd: 1.17, z: 0.94, state: "hot", base: 0.90 },
+              { name: "Ethan", agent: "kay/o", k: 13, d: 9, kd: 1.44, z: 0.62, state: "hot", base: 1.16 },
+              { name: "skuba", agent: "viper", k: 8, d: 8, kd: 1.00, z: -0.50, state: "normal", base: 1.16 }
+            ]
+          },
+          { num: 3, map: "lotus", s1: 10, s2: 13, winner: "NRG", z1: -0.24, z2: 0.16, pred: { p1: 5.2, p2: 94.8, correct: true },
+            t1: [
+              { name: "v1c", agent: "omen", k: 20, d: 16, kd: 1.25, z: 0.48, state: "normal", base: 1.08 },
+              { name: "OXY", agent: "raze", k: 22, d: 19, kd: 1.16, z: -0.07, state: "normal", base: 1.19 },
+              { name: "mitch", agent: "fade", k: 11, d: 18, kd: 0.61, z: -0.13, state: "normal", base: 0.65 },
+              { name: "Xeppaa", agent: "vyse", k: 13, d: 19, kd: 0.68, z: -0.55, state: "cold", base: 0.83 },
+              { name: "neT", agent: "viper", k: 7, d: 20, kd: 0.35, z: -0.95, state: "cold", base: 0.71 }
+            ],
+            t2: [
+              { name: "s0m", agent: "omen", k: 17, d: 13, kd: 1.31, z: 1.44, state: "hot", base: 0.90 },
+              { name: "Ethan", agent: "fade", k: 23, d: 16, kd: 1.44, z: 0.60, state: "hot", base: 1.16 },
+              { name: "brawk", agent: "vyse", k: 21, d: 12, kd: 1.75, z: 0.23, state: "normal", base: 1.56 },
+              { name: "mada", agent: "raze", k: 19, d: 16, kd: 1.19, z: -0.05, state: "normal", base: 1.24 },
+              { name: "skuba", agent: "viper", k: 11, d: 16, kd: 0.69, z: -1.46, state: "cold", base: 1.16 }
+            ]
+          }
+        ]
+      }
+    ];
+
+    const PROGRESSION = [
+      { name: "v1c", team: "Cloud9", data: [{g:1,kd:1.47,s:"hot"},{g:2,kd:0.50,s:"tilted"},{g:3,kd:1.25,s:"normal"}] },
+      { name: "OXY", team: "Cloud9", data: [{g:1,kd:1.50,s:"hot"},{g:2,kd:0.43,s:"tilted"},{g:3,kd:1.16,s:"normal"}] },
+      { name: "neT", team: "Cloud9", data: [{g:1,kd:1.20,s:"hot"},{g:2,kd:0.50,s:"cold"},{g:3,kd:0.35,s:"cold"}] },
+      { name: "mada", team: "NRG", data: [{g:1,kd:0.75,s:"normal"},{g:2,kd:4.20,s:"fire"},{g:3,kd:1.19,s:"normal"}] },
+      { name: "brawk", team: "NRG", data: [{g:1,kd:0.76,s:"cold"},{g:2,kd:2.57,s:"hot"},{g:3,kd:1.75,s:"normal"}] }
+    ];
+
+    // === HELPERS ===
+    const stateColor = s => ({fire:'#ff0055',hot:'#00f0ff',normal:'#555',cold:'#ffd000',tilted:'#ff0055'}[s]||'#555');
+    const stateIcon = s => ({fire:'🔥',hot:'📈',normal:'➖',cold:'📉',tilted:'💀'}[s]||'➖');
+    const stateName = s => ({fire:'ON FIRE',hot:'HOT',normal:'NORMAL',cold:'COLD',tilted:'TILTED'}[s]||'NORMAL');
+
+    // === LOADING SCREEN ===
+    const LoadingScreen = ({ onComplete }) => {
+      const [progress, setProgress] = useState(0);
+      const [status, setStatus] = useState('Initializing systems...');
+      
+      useEffect(() => {
+        const steps = [
+          [15, 'Connecting to GRID API...'],
+          [30, 'Fetching match data...'],
+          [50, 'Building player baselines...'],
+          [70, 'Training ML ensemble...'],
+          [85, 'Analyzing tilt patterns...'],
+          [100, 'Systems ready!']
+        ];
+        let i = 0;
+        const run = () => {
+          if (i < steps.length) {
+            setProgress(steps[i][0]);
+            setStatus(steps[i][1]);
+            i++;
+            setTimeout(run, 350);
+          } else {
+            setTimeout(onComplete, 400);
+          }
+        };
+        setTimeout(run, 300);
+      }, []);
+
+      return (
+        <div style={{position:'fixed',inset:0,background:'#0a0a12',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:1000}}>
+          <div style={{position:'absolute',inset:0,overflow:'hidden'}}>
+            <div style={{position:'absolute',width:'100%',height:'2px',background:'linear-gradient(90deg,transparent,#00f0ff,transparent)',top:'0%',animation:'scanline 2s linear infinite'}}/>
+          </div>
+          <div style={{width:'90px',height:'90px',background:'linear-gradient(135deg,#ff0055,#ff0055aa)',borderRadius:'20px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 60px #ff005566',border:'2px solid #ff0055',marginBottom:'30px'}}>
+            <span style={{fontSize:'50px'}}>🎯</span>
+          </div>
+          <h1 style={{fontSize:'42px',fontWeight:900,letterSpacing:'6px',marginBottom:'8px',background:'linear-gradient(90deg,#fff,#00f0ff)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>TILTSCOPE</h1>
+          <p style={{color:'#00f0ff',fontSize:'12px',letterSpacing:'4px',marginBottom:'50px'}}>AI-POWERED ESPORTS ANALYSIS</p>
+          <div style={{width:'320px',height:'6px',background:'rgba(255,255,255,0.1)',borderRadius:'3px',overflow:'hidden',marginBottom:'20px'}}>
+            <div style={{height:'100%',background:'linear-gradient(90deg,#ff0055,#00f0ff)',borderRadius:'3px',boxShadow:'0 0 20px #00f0ff',transition:'width 0.4s ease',width:`${progress}%`}}/>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+            <div style={{width:'8px',height:'8px',borderRadius:'50%',background:'#00f0ff',animation:'pulse 0.6s infinite'}}/>
+            <span style={{color:'#888',fontSize:'14px',fontFamily:'monospace'}}>{status}</span>
+          </div>
+          <div style={{position:'absolute',bottom:'30px',color:'#333',fontSize:'11px'}}>v1.0.0 • Cloud9 x JetBrains Hackathon</div>
+        </div>
+      );
+    };
+
+    // === NAV ===
+    const Nav = () => (
+      <nav style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 24px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'rgba(10,10,18,0.95)',position:'sticky',top:0,zIndex:100,backdropFilter:'blur(12px)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+          <div style={{width:'38px',height:'38px',background:'linear-gradient(135deg,#ff0055,#ff0055aa)',borderRadius:'10px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 25px #ff005544'}}>
+            <span style={{fontSize:'20px'}}>🎯</span>
+          </div>
+          <div>
+            <span style={{fontSize:'22px',fontWeight:800,letterSpacing:'3px',background:'linear-gradient(90deg,#fff,#00f0ff)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>TILTSCOPE</span>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:'8px'}}>
+          <a href="index.html" style={{padding:'10px 24px',background:'linear-gradient(135deg,#ff0055,#ff0055aa)',border:'1px solid #ff0055',borderRadius:'8px',color:'#fff',textDecoration:'none',fontSize:'13px',fontWeight:600,letterSpacing:'1px'}}>📊 DASHBOARD</a>
+          <a href="docs.html" style={{padding:'10px 24px',background:'transparent',border:'1px solid rgba(255,255,255,0.2)',borderRadius:'8px',color:'#888',textDecoration:'none',fontSize:'13px',fontWeight:600,letterSpacing:'1px',transition:'all 0.3s'}}>📖 DOCS</a>
+        </div>
+      </nav>
+    );
+
+    // === PLAYER CARD ===
+    const PlayerCard = ({ p, delay = 0 }) => {
+      const [show, setShow] = useState(false);
+      useEffect(() => { setTimeout(() => setShow(true), delay); }, []);
+      if (!show) return <div style={{height:'130px',marginBottom:'12px'}}/>;
+      
+      const c = stateColor(p.state);
+      return (
+        <div className="fade-in" style={{background:'linear-gradient(135deg,rgba(18,18,28,0.95),rgba(12,12,20,0.98))',border:`1px solid ${c}33`,borderRadius:'10px',padding:'16px',marginBottom:'12px',position:'relative',overflow:'hidden',cursor:'pointer',transition:'all 0.3s ease',boxShadow:(p.state==='fire'||p.state==='tilted')?`0 0 30px ${c}33`:'none'}}
+          onMouseEnter={e=>{e.currentTarget.style.transform='translateX(6px)';e.currentTarget.style.borderColor=c+'66';}}
+          onMouseLeave={e=>{e.currentTarget.style.transform='translateX(0)';e.currentTarget.style.borderColor=c+'33';}}>
+          <div style={{position:'absolute',top:0,left:0,right:0,height:'3px',background:`linear-gradient(90deg,${c},transparent)`,boxShadow:`0 0 15px ${c}`}}/>
+          {p.state==='tilted'&&<div style={{position:'absolute',inset:0,opacity:0.08,background:'repeating-linear-gradient(0deg,transparent,transparent 2px,#ff0055 2px,#ff0055 4px)',pointerEvents:'none'}}/>}
+          {p.state==='fire'&&<div style={{position:'absolute',inset:0,opacity:0.05,background:'radial-gradient(circle at 50% 0%,#ff0055,transparent 70%)',pointerEvents:'none'}}/>}
+          
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'4px'}}>
+                <span style={{fontSize:'18px',fontWeight:700}}>{p.name}</span>
+                <span style={{fontSize:'16px'}}>{stateIcon(p.state)}</span>
+                <span style={{fontSize:'9px',padding:'3px 8px',borderRadius:'4px',background:`${c}22`,color:c,fontWeight:700,letterSpacing:'0.5px'}}>{stateName(p.state)}</span>
+              </div>
+              <div style={{fontSize:'12px',color:'#00f0ff',textTransform:'uppercase',letterSpacing:'2px'}}>{p.agent}</div>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:'28px',fontWeight:900,color:p.kd>=1.2?'#00f0ff':(p.kd<0.6?'#ff0055':'#fff'),textShadow:p.kd>=1.5?'0 0 20px #00f0ff':(p.kd<0.5?'0 0 20px #ff0055':'none')}}>{p.kd.toFixed(2)}</div>
+              <div style={{fontSize:'10px',color:'#666'}}>K/D RATIO</div>
+            </div>
+          </div>
+          
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',margin:'14px 0',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.05)',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+            <span><span style={{color:'#0f0',fontWeight:700}}>{p.k}</span> <span style={{color:'#666'}}>KILLS</span></span>
+            <span><span style={{color:'#f55',fontWeight:700}}>{p.d}</span> <span style={{color:'#666'}}>DEATHS</span></span>
+            <span><span style={{color:'#888',fontWeight:600}}>{p.base}</span> <span style={{color:'#666'}}>BASELINE</span></span>
+          </div>
+          
+          <div style={{marginBottom:'6px',display:'flex',justifyContent:'space-between',fontSize:'10px'}}>
+            <span style={{color:'#666'}}>Z-SCORE DEVIATION</span>
+            <span style={{color:c,fontWeight:700}}>{p.z>0?'+':''}{p.z.toFixed(2)}σ</span>
+          </div>
+          <div style={{position:'relative',height:'6px',background:'rgba(255,255,255,0.08)',borderRadius:'3px',overflow:'hidden'}}>
+            <div style={{position:'absolute',left:'50%',width:'2px',height:'100%',background:'#333',transform:'translateX(-50%)'}}/>
+            <div style={{position:'absolute',left:p.z>0?'50%':`${50+p.z*10}%`,width:`${Math.min(Math.abs(p.z)*10,48)}%`,height:'100%',background:c,borderRadius:'3px',boxShadow:`0 0 10px ${c}`,animation:'barFill 0.8s ease'}}/>
+          </div>
+        </div>
+      );
+    };
+
+    // === MAIN DASHBOARD ===
+    const Dashboard = () => {
+      const [match] = useState(MATCHES[0]);
+      const [gameIdx, setGameIdx] = useState(0);
+      const [loading, setLoading] = useState(false);
+      const [lastUpdate, setLastUpdate] = useState(new Date());
+      const [autoRefresh, setAutoRefresh] = useState(false);
+      const [animKey, setAnimKey] = useState(0);
+      
+      const game = match.games[gameIdx];
+
+      const refresh = () => {
+        setLoading(true);
+        setTimeout(() => {
+          setLoading(false);
+          setLastUpdate(new Date());
+          setAnimKey(k => k + 1);
+        }, 1200);
+      };
+
+      const switchGame = (idx) => {
+        if (idx !== gameIdx) {
+          setLoading(true);
+          setTimeout(() => {
+            setGameIdx(idx);
+            setLoading(false);
+            setAnimKey(k => k + 1);
+          }, 400);
+        }
+      };
+
+      useEffect(() => {
+        if (autoRefresh) {
+          const interval = setInterval(refresh, 30000);
+          return () => clearInterval(interval);
+        }
+      }, [autoRefresh]);
+
+      return (
+        <div style={{padding:'24px',maxWidth:'1300px',margin:'0 auto'}}>
+          {/* Loading Overlay */}
+          {loading && (
+            <div style={{position:'fixed',inset:0,background:'rgba(10,10,18,0.9)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,backdropFilter:'blur(4px)'}}>
+              <div style={{textAlign:'center'}}>
+                <div style={{width:'60px',height:'60px',border:'3px solid #333',borderTopColor:'#00f0ff',borderRadius:'50%',animation:'spin 0.8s linear infinite',margin:'0 auto 16px'}}/>
+                <div style={{color:'#00f0ff',fontSize:'14px',letterSpacing:'2px'}}>ANALYZING DATA...</div>
+              </div>
+            </div>
+          )}
+
+          {/* Control Bar */}
+          <div className="fade-in" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'24px',flexWrap:'wrap',gap:'16px'}}>
+            <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
+              <button onClick={refresh} disabled={loading} style={{padding:'12px 24px',cursor:loading?'not-allowed':'pointer',background:'linear-gradient(135deg,rgba(0,240,255,0.15),rgba(0,240,255,0.05))',border:'1px solid #00f0ff44',borderRadius:'8px',color:'#00f0ff',fontSize:'13px',fontWeight:600,display:'flex',alignItems:'center',gap:'10px',transition:'all 0.3s'}}>
+                <span style={{display:'inline-block',animation:loading?'spin 1s linear infinite':'none',fontSize:'16px'}}>⟳</span>
+                {loading ? 'ANALYZING...' : 'REFRESH DATA'}
+              </button>
+              <button onClick={()=>setAutoRefresh(!autoRefresh)} style={{padding:'12px 24px',cursor:'pointer',background:autoRefresh?'rgba(0,255,100,0.12)':'transparent',border:`1px solid ${autoRefresh?'#0f6':'rgba(255,255,255,0.15)'}`,borderRadius:'8px',color:autoRefresh?'#0f6':'#666',fontSize:'13px',fontWeight:600,transition:'all 0.3s'}}>
+                <span style={{marginRight:'8px'}}>{autoRefresh?'●':'○'}</span>AUTO-REFRESH {autoRefresh?'ON':'OFF'}
+              </button>
+              <button onClick={()=>{setGameIdx(0);setAnimKey(k=>k+1);}} style={{padding:'12px 24px',cursor:'pointer',background:'transparent',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'8px',color:'#888',fontSize:'13px',fontWeight:600,transition:'all 0.3s'}}>
+                ↺ RESET VIEW
+              </button>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:'20px'}}>
+              <span style={{color:'#555',fontSize:'12px'}}>Last: {lastUpdate.toLocaleTimeString()}</span>
+              <div style={{padding:'8px 16px',background:'rgba(0,255,100,0.1)',border:'1px solid rgba(0,255,100,0.3)',borderRadius:'6px',color:'#0f6',fontSize:'12px',fontWeight:700,animation:'pulse 2s infinite'}}>● LIVE</div>
+            </div>
+          </div>
+
+          {/* Match Header */}
+          <div key={`header-${animKey}`} className="fade-in" style={{background:'linear-gradient(180deg,rgba(255,0,85,0.1) 0%,transparent 100%)',border:'1px solid #ff005522',borderRadius:'16px',padding:'32px',marginBottom:'24px',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,transparent,#ff0055,transparent)'}}/>
+            <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:'50px',flexWrap:'wrap'}}>
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:'32px',fontWeight:800,color:match.winner===match.team1?'#00f0ff':'#aaa',textShadow:match.winner===match.team1?'0 0 30px #00f0ff':'none',transition:'all 0.5s'}}>{match.team1}</div>
+                <div style={{fontSize:'64px',fontWeight:900,lineHeight:1}}>{match.score1}</div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'8px'}}>
+                <div style={{fontSize:'24px',color:'#ff0055',fontWeight:800,padding:'12px 28px',border:'2px solid #ff005544',borderRadius:'12px',background:'rgba(255,0,85,0.1)'}}>VS</div>
+                <div style={{fontSize:'10px',color:'#666',letterSpacing:'2px'}}>BEST OF 3</div>
+              </div>
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:'32px',fontWeight:800,color:match.winner===match.team2?'#ff0055':'#aaa',textShadow:match.winner===match.team2?'0 0 30px #ff0055':'none',transition:'all 0.5s'}}>{match.team2}</div>
+                <div style={{fontSize:'64px',fontWeight:900,lineHeight:1}}>{match.score2}</div>
+              </div>
+            </div>
+            <div style={{textAlign:'center',marginTop:'20px'}}>
+              <span style={{padding:'8px 20px',background:'rgba(0,240,255,0.1)',border:'1px solid rgba(0,240,255,0.2)',borderRadius:'20px',fontSize:'12px',color:'#00f0ff',letterSpacing:'1px'}}>{match.tournament}</span>
+            </div>
+          </div>
+
+          {/* Game Selector */}
+          <div className="fade-in" style={{display:'flex',gap:'12px',marginBottom:'24px',flexWrap:'wrap'}}>
+            {match.games.map((g, i) => (
+              <button key={i} onClick={() => switchGame(i)} style={{padding:'16px 28px',cursor:'pointer',fontSize:'14px',fontWeight:700,background:gameIdx===i?'linear-gradient(135deg,#ff0055,#ff0055aa)':'rgba(255,255,255,0.03)',border:gameIdx===i?'2px solid #ff0055':'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',color:'#fff',transition:'all 0.3s ease',boxShadow:gameIdx===i?'0 0 30px #ff005555':'none',transform:gameIdx===i?'scale(1.02)':'scale(1)'}}>
+                <div style={{fontSize:'18px'}}>GAME {g.num}</div>
+                <div style={{fontSize:'11px',opacity:0.7,marginTop:'4px',letterSpacing:'2px'}}>{g.map.toUpperCase()}</div>
+                <div style={{fontSize:'22px',marginTop:'6px',fontWeight:900}}>{g.s1} - {g.s2}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* Game Score Banner */}
+          <div key={`score-${animKey}-${gameIdx}`} className="fade-in" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'30px',padding:'20px',background:'rgba(255,255,255,0.02)',borderRadius:'12px',marginBottom:'24px',border:'1px solid rgba(255,255,255,0.05)'}}>
+            <div style={{fontSize:'16px',color:'#00f0ff',letterSpacing:'4px',textTransform:'uppercase',fontWeight:700}}>{game.map}</div>
+            <div style={{display:'flex',alignItems:'center',gap:'20px'}}>
+              <span style={{fontSize:'48px',fontWeight:900,color:game.winner===match.team1?'#00f0ff':'#444',textShadow:game.winner===match.team1?'0 0 30px #00f0ff':'none'}}>{game.s1}</span>
+              <span style={{color:'#ff0055',fontWeight:900,fontSize:'28px'}}>:</span>
+              <span style={{fontSize:'48px',fontWeight:900,color:game.winner===match.team2?'#ff0055':'#444',textShadow:game.winner===match.team2?'0 0 30px #ff0055':'none'}}>{game.s2}</span>
+            </div>
+            <span style={{padding:'6px 16px',borderRadius:'6px',fontSize:'12px',fontWeight:700,background:game.winner===match.team1?'rgba(0,240,255,0.2)':'rgba(255,0,85,0.2)',color:game.winner===match.team1?'#00f0ff':'#ff0055'}}>{game.winner} WINS</span>
+          </div>
+
+          {/* Teams Grid */}
+          <div key={`teams-${animKey}-${gameIdx}`} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:'28px'}}>
+            {/* Team 1 */}
+            <div className="slide-in">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 18px',background:'linear-gradient(90deg,rgba(0,240,255,0.12),transparent)',border:'1px solid rgba(0,240,255,0.2)',borderRadius:'12px',marginBottom:'16px'}}>
+                <span style={{fontWeight:800,fontSize:'20px'}}>{match.team1}</span>
+                <span style={{color:game.z1>=0?'#0f6':'#ff0055',fontWeight:700,fontSize:'15px',fontFamily:'monospace'}}>Z: {game.z1>0?'+':''}{game.z1.toFixed(2)}</span>
+              </div>
+              {game.t1.map((p, i) => <PlayerCard key={`${animKey}-${gameIdx}-t1-${i}`} p={p} delay={i * 80} />)}
+            </div>
+            
+            {/* Team 2 */}
+            <div className="slide-in" style={{animationDelay:'0.1s'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 18px',background:'linear-gradient(90deg,rgba(255,0,85,0.12),transparent)',border:'1px solid rgba(255,0,85,0.2)',borderRadius:'12px',marginBottom:'16px'}}>
+                <span style={{fontWeight:800,fontSize:'20px'}}>{match.team2}</span>
+                <span style={{color:game.z2>=0?'#0f6':'#ff0055',fontWeight:700,fontSize:'15px',fontFamily:'monospace'}}>Z: {game.z2>0?'+':''}{game.z2.toFixed(2)}</span>
+              </div>
+              {game.t2.map((p, i) => <PlayerCard key={`${animKey}-${gameIdx}-t2-${i}`} p={p} delay={i * 80 + 50} />)}
+            </div>
+          </div>
+
+          {/* ML Prediction */}
+          <div key={`pred-${animKey}-${gameIdx}`} className="fade-in" style={{background:'linear-gradient(135deg,rgba(0,240,255,0.06),rgba(255,0,85,0.06))',border:'1px solid rgba(0,240,255,0.15)',borderRadius:'16px',padding:'24px',marginTop:'28px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
+              <span style={{fontSize:'24px'}}>🎯</span>
+              <span style={{color:'#00f0ff',fontWeight:800,letterSpacing:'3px',fontSize:'15px'}}>ML ENSEMBLE PREDICTION</span>
+              <span style={{marginLeft:'auto',padding:'8px 18px',fontSize:'13px',fontWeight:700,borderRadius:'8px',background:game.pred.correct?'rgba(0,255,100,0.15)':'rgba(255,0,85,0.15)',border:`2px solid ${game.pred.correct?'#0f6':'#ff0055'}`,color:game.pred.correct?'#0f6':'#ff0055'}}>{game.pred.correct?'✓ CORRECT PREDICTION':'✗ INCORRECT'}</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'24px'}}>
+              <div>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'8px'}}>
+                  <span style={{color:game.pred.p1>50?'#00f0ff':'#666',fontWeight:700,fontSize:'16px'}}>{match.team1}</span>
+                  <span style={{color:game.pred.p1>50?'#00f0ff':'#666',fontWeight:900,fontSize:'24px'}}>{game.pred.p1}%</span>
+                </div>
+                <div style={{height:'10px',background:'rgba(255,255,255,0.08)',borderRadius:'5px',overflow:'hidden'}}>
+                  <div style={{width:`${game.pred.p1}%`,height:'100%',background:game.pred.p1>50?'#00f0ff':'#444',borderRadius:'5px',boxShadow:game.pred.p1>50?'0 0 15px #00f0ff':'none',animation:'barFill 1s ease'}}/>
+                </div>
+              </div>
+              <div>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'8px'}}>
+                  <span style={{color:game.pred.p2>50?'#ff0055':'#666',fontWeight:700,fontSize:'16px'}}>{match.team2}</span>
+                  <span style={{color:game.pred.p2>50?'#ff0055':'#666',fontWeight:900,fontSize:'24px'}}>{game.pred.p2}%</span>
+                </div>
+                <div style={{height:'10px',background:'rgba(255,255,255,0.08)',borderRadius:'5px',overflow:'hidden'}}>
+                  <div style={{width:`${game.pred.p2}%`,height:'100%',background:game.pred.p2>50?'#ff0055':'#444',borderRadius:'5px',boxShadow:game.pred.p2>50?'0 0 15px #ff0055':'none',animation:'barFill 1s ease'}}/>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tilt Progression */}
+          <div key={`prog-${animKey}`} className="fade-in" style={{background:'rgba(12,12,20,0.8)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',padding:'24px',marginTop:'28px'}}>
+            <h3 style={{color:'#00f0ff',margin:'0 0 20px 0',fontSize:'15px',letterSpacing:'3px',display:'flex',alignItems:'center',gap:'10px'}}>
+              <span>📈</span> TILT PROGRESSION TRACKER
+            </h3>
+            <div style={{display:'flex',flexDirection:'column',gap:'14px'}}>
+              {PROGRESSION.map((player, idx) => (
+                <div key={idx} className="slide-in" style={{display:'flex',alignItems:'center',gap:'14px',animationDelay:`${idx*80}ms`}}>
+                  <div style={{width:'90px',fontSize:'13px',fontWeight:700,color:player.team==='Cloud9'?'#00f0ff':'#ff0055'}}>{player.name}</div>
+                  <div style={{display:'flex',gap:'10px',flex:1,alignItems:'center'}}>
+                    {player.data.map((pt, i) => (
+                      <React.Fragment key={i}>
+                        <div style={{padding:'8px 16px',borderRadius:'8px',fontSize:'12px',textAlign:'center',minWidth:'70px',background:`${stateColor(pt.s)}12`,border:`1px solid ${stateColor(pt.s)}33`,cursor:'pointer',transition:'all 0.3s'}}
+                          onMouseEnter={e=>e.currentTarget.style.transform='scale(1.08)'}
+                          onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                          <div style={{color:stateColor(pt.s),fontWeight:800,fontSize:'16px'}}>{pt.kd.toFixed(2)}</div>
+                          <div style={{fontSize:'9px',color:'#666',marginTop:'2px'}}>GAME {pt.g}</div>
+                        </div>
+                        {i<player.data.length-1&&<span style={{color:'#333',fontSize:'14px'}}>→</span>}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  <div style={{fontSize:'18px',width:'35px',textAlign:'center'}}>{player.data[2].kd>player.data[0].kd?'📈':player.data[2].kd<player.data[0].kd?'📉':'➖'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // === APP ===
+    const App = () => {
+      const [loading, setLoading] = useState(true);
+      if (loading) return <LoadingScreen onComplete={() => setLoading(false)} />;
+
+      return (
+        <div style={{minHeight:'100vh',background:'#0a0a12'}}>
+          <div style={{position:'fixed',inset:0,pointerEvents:'none',backgroundImage:'linear-gradient(rgba(0,240,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,0.015) 1px,transparent 1px)',backgroundSize:'60px 60px'}}/>
+          <div style={{position:'fixed',top:'-250px',right:'-250px',width:'700px',height:'700px',background:'radial-gradient(circle,rgba(255,0,85,0.1) 0%,transparent 70%)',pointerEvents:'none'}}/>
+          <div style={{position:'fixed',bottom:'-250px',left:'-250px',width:'700px',height:'700px',background:'radial-gradient(circle,rgba(0,240,255,0.08) 0%,transparent 70%)',pointerEvents:'none'}}/>
+          <div style={{position:'relative'}}>
+            <Nav />
+            <Dashboard />
+            <footer style={{padding:'24px',textAlign:'center',borderTop:'1px solid rgba(255,255,255,0.05)',color:'#333',fontSize:'12px'}}>
+              <span style={{color:'#00f0ff'}}>TILTSCOPE</span> • AI-Powered Esports Analysis • <span style={{color:'#ff0055'}}>Cloud9 x JetBrains Hackathon 2025</span>
+            </footer>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
